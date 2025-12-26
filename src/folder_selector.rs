@@ -7,12 +7,12 @@ use crate::folder_formatter::json_formatting::format_paths;
 
 #[derive(Serialize)]
 pub struct FileNode {
-    name: String,
-    path: String,
-    is_dir: bool,
-    children: Option<Vec<FileNode>>,
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub children: Option<Vec<FileNode>>,
     // indicates if there are more children not yet loaded (for "lazy load")
-    has_more: Option<bool>,
+    pub has_more: Option<bool>,
 }
 
 fn dir_has_children(p: &PathBuf) -> bool {
@@ -118,13 +118,16 @@ fn read_children(
 }
 
 
-pub fn read_directory(path: String, max_depth: Option<u32>) -> Result<FileNode, String> {
-    let root = PathBuf::from(&path);
+pub fn read_directory<P: AsRef<Path>>(path: P, max_depth: Option<u32>) -> Result<FileNode, std::io::Error> {
+    let root = PathBuf::from(path.as_ref());
     if !root.exists() {
-        return Err(format!("Path not found: {}", path));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Path not found: {}", root.to_string_lossy()),
+        ));
     }
 
-    build_node(&root, 0, max_depth).map_err(|e| e.to_string())
+    build_node(&root, 0, max_depth)
 }
 
 fn map_file_type(ft: fs::FileType) -> FT {
@@ -178,13 +181,16 @@ pub fn collect_paths(root: &Path, max_depth: Option<u32>) -> Vec<(String, FT)> {
 }
 
 
-pub fn read_directory_fast(path: String, max_depth: Option<u32>) -> Result<String, String> {
-    let root = Path::new(&path);
+pub fn read_directory_fast<P: AsRef<Path>>(path: P, max_depth: Option<u32>) -> Result<String, std::io::Error> {
+    let root = path.as_ref();
     if !root.exists() {
-        return Err(format!("Path not found: {}", path));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Path not found: {}", root.to_string_lossy()),
+        ));
     }
 
     let children = collect_paths(root, max_depth);
     // format_paths 會用 FileTree::new 去建樹並 serialize
-    Ok(format_paths(&path, children))
+    Ok(format_paths(&root.to_string_lossy(), children))
 }
